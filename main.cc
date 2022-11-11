@@ -60,7 +60,9 @@ int main(int argc, char* argv[]) {
       // given at the command line.
       if (mode == 1) {
          P=1;
-         const_file.open(argv[6]);         
+         std::string arg = argv[6];
+         std::string name = "./part1/" + arg;
+         const_file.open(name);         
       }
       else {
          P = atoi(argv[6]);
@@ -177,9 +179,9 @@ void genROM(vector<int>& constVector, int bits, string modName, ofstream &os) {
 // Here is where you add your code to produce a neural network layer.
 void genFCLayer(int M, int N, int T, int R, int P, vector<int>& constVector, string modName, ofstream &os) {
 
-   os << "module " << modName << "();" << endl;
-   os << "   // your stuff here!" << endl;
-   os << "endmodule" << endl << endl;
+   // os << "module " << modName << "();" << endl;
+   // os << "   // your stuff here!" << endl;
+   // os << "endmodule" << endl << endl;
 
    // You will need to generate ROM(s) with values from the pre-stored constant values.
    // Here is code that demonstrates how to do this for the simple case where you want to put all of
