@@ -7,7 +7,7 @@ Date: November 16, 2022
 
 
 `include "<ROM.sv>"
-`include "mac_part1.sv"
+`include "mac_part2.sv"
 `include "memory.sv"
 
 module Counter(clk, reset, clear, enable, countOut);
@@ -28,39 +28,35 @@ module Counter(clk, reset, clear, enable, countOut);
     
 endmodule
 
-module ReLU (mac_output, output_valid, output_data);
+module ReLU (ReLU_input, output_data);
     parameter T = 14;
 
-    input output_valid;
-    input logic [T - 1:0] mac_output;
-
+    input logic [T - 1:0] ReLU_input;
     output logic [T - 1:0] output_data;
 
     always_comb begin
-
-        if(output_valid) begin
-            if(mac_output[T - 1])
-                output_data = 0;
-            else if(~mac_output[T - 1])
-                output_data = mac_output;
-        end
-        else
-            output_data = mac_output;        
+        if(ReLU_input[T - 1])
+            output_data = 0;
+        else if(~ReLU_input[T - 1])
+            output_data = ReLU_input;   
     end
     
 endmodule
 
-module Controller(clk, reset, input_valid, output_ready, addr_x, wr_en_x, addr_w, clear_acc, en_acc, en_pipeline_reg, enable_mult, input_ready, output_valid, output_data);
+module Controller(clk, reset, input_valid, output_ready, addr_x, wr_en_x, addr_w, clear_acc, en_acc, en_pipeline_reg, enable_mult, input_ready, output_valid, <MAC_OUTPUT_PARAM_TEMPLATE>, output_data);
     
     parameter M = 5;
     parameter N = 4;
     parameter T = 14;
+    parameter P = 2;
+    parameter ReLU = 0;
     parameter ADDR_X_SIZE = 2;
     parameter ADDR_W_SIZE = 4;
     parameter WIDTH_MEM_READ_X = 2;         
     parameter WIDTH_MEM_READ_W = 4;         
     parameter WIDTH_MAC = 4; 
-    parameter WIDTH_EXEC = 4;               
+    parameter WIDTH_EXEC = 4;
+    parameter WIDTH_MAC_SELECT = 4;             
 
     parameter delay_pipeline_n = 4;
     parameter pipelineStages = 0;
@@ -69,12 +65,15 @@ module Controller(clk, reset, input_valid, output_ready, addr_x, wr_en_x, addr_w
 
     input clk, reset, input_valid, output_ready;
     output logic input_ready, output_valid;
-    input logic signed [T - 1:0] output_data;
+
+    output logic signed [T - 1:0] output_data;
+    input logic signed [T - 1:0] <MAC_OUTPUT_TEMPLATE>;     //mac_output0, mac_output1, mac_output2;
 
     output logic [ADDR_X_SIZE-1:0] addr_x;  
     output logic [ADDR_W_SIZE-1:0] addr_w;
-    output logic wr_en_x, clear_acc, en_acc, en_pipeline_reg, enable_mult;    
-     
+    output logic wr_en_x, clear_acc, en_acc, en_pipeline_reg, enable_mult; 
+
+
     logic operationState;                                       //0 -> writing state, 1 -> reading/execution state
     logic initialExecState;                                     //1 -> initial state in execution (meaing we just switched from writing to execution), 0 -> not initial state
     logic clearState;                                           //1 -> clear state (to clear necessary signals and registers after finishing writing or executing), 0 -> not clear state
@@ -83,12 +82,16 @@ module Controller(clk, reset, input_valid, output_ready, addr_x, wr_en_x, addr_w
     logic clear_cntrMemX, enable_cntrReadMem_X;      
     logic clear_cntrMemW, enable_cntrReadMem_W;
     logic clear_cntrExec, enable_cntrExec;
+    logic clear_cntrMacSelect, enable_cntrMacSelect;
 
 
     logic [WIDTH_MAC-1:0] countMacOut;
     logic [WIDTH_MEM_READ_X-1:0] countMem_X_Out;
     logic [WIDTH_MEM_READ_W-1:0] countMem_W_Out;
     logic [WIDTH_EXEC-1:0] countExecOut;
+    logic [WIDTH_MAC_SELECT-1:0] countMacSelect;
+
+    logic [T - 1:0] muxOutput;
 
 
     always_ff @( posedge clk ) begin
@@ -167,10 +170,12 @@ module Controller(clk, reset, input_valid, output_ready, addr_x, wr_en_x, addr_w
             end
 
             if(output_valid && output_ready) begin     //(reference #1). On posedge when output_valid and output_ready is asserted, the valid data is sampled and we clear the accumulator and de-assert output_valid
-                clear_acc <= 1;
-                output_valid <= 0;
-                enable_cntrExec <= 1;
-                clear_cntrMac <= 1;
+                if(countMacSelect == P-1) begin
+                    clear_acc <= 1;
+                    output_valid <= 0;
+                    enable_cntrExec <= 1;
+                    clear_cntrMac <= 1;
+                end
             end
             else begin
                 clear_acc <= 0;
@@ -178,7 +183,7 @@ module Controller(clk, reset, input_valid, output_ready, addr_x, wr_en_x, addr_w
                 clear_cntrMac <= 0;
             end
 
-            if(countExecOut == M) begin       //we have the final value of matrix at this delay and waiting for clear_acc to be asserted once value is sampled and then we switch to clear state
+            if(countExecOut == M/P) begin       //we have the final value of matrix at this delay and waiting for clear_acc to be asserted once value is sampled and then we switch to clear state
                 clear_cntrMac <= 1;
                 clear_acc <= 1;
                 clear_cntrExec <= 1;
@@ -202,11 +207,39 @@ module Controller(clk, reset, input_valid, output_ready, addr_x, wr_en_x, addr_w
         enable_cntrMac = 0;
         clear_cntrMemX = clearState ? 1 : 0;
         clear_cntrMemW = clearState ? 1 : 0;
+
+        enable_cntrMacSelect = 0;
+        clear_cntrMacSelect = (countMacSelect == P) ? 1 : 0;
+        if(output_valid && output_ready) begin
+            enable_cntrMacSelect = 1;
+            if(countMacOut == P-1) begin
+                enable_cntrMacSelect = 0;
+            end
+        end
+
+        
+        case (countMacSelect)
+            <MUX_TEMPLATE>
+            default: muxOutput = 0;
+        endcase
+
+
+        // case (countMacSelect)
+        //     0:muxOutput = mac_output0;
+        //     1:muxOutput = mac_output1;
+        //     2:muxOutput = mac_output2; 
+        //     default: muxOutput = 0;
+        // endcase
+
         if(operationState && ~clearState) begin    //read mode
             wr_en_x = input_ready;
             enable_cntrReadMem_X = countExecOut < M ? ~output_valid : 0;
             enable_cntrReadMem_W = ~output_valid;
             enable_cntrMac = en_acc ? 1 : 0;
+            
+
+            
+
 
             if((countMacOut == (delay_pipeline_n)) && ~clear_acc) begin     //Stall address and delay counters when output_valid = 1 and accumulator is not yet cleared (since value is not sampled yet)
                 enable_cntrReadMem_X = 0;
@@ -215,6 +248,7 @@ module Controller(clk, reset, input_valid, output_ready, addr_x, wr_en_x, addr_w
             end
 
             clear_cntrMemX = (countMem_X_Out == N-1) && (enable_cntrReadMem_X) ? 1 : 0;       //clear vector counter after count N-1 as we don't have any value at address >= N
+
             
         end
         else if(~operationState && ~clearState) begin                          //write mode
@@ -243,6 +277,15 @@ module Controller(clk, reset, input_valid, output_ready, addr_x, wr_en_x, addr_w
     Counter #(WIDTH_EXEC) cntrExec (clk, reset, clear_cntrExec, enable_cntrExec, countExecOut);
     Counter #(WIDTH_MEM_READ_X) cntrMemX (clk, reset, clear_cntrMemX, enable_cntrReadMem_X, countMem_X_Out);
     Counter #(WIDTH_MEM_READ_W) cntrMemW (clk, reset, clear_cntrMemW, enable_cntrReadMem_W, countMem_W_Out);
+    Counter #(WIDTH_MAC_SELECT) cntrMacSelect(clk, reset, clear_cntrMacSelect, enable_cntrMacSelect, countMacSelect);
+
+    generate
+        if(ReLU) begin
+            ReLU #(T) ReLU(muxOutput, output_data);
+        end
+        else
+            assign output_data = muxOutput;
+    endgenerate
 
 endmodule
 
@@ -252,6 +295,7 @@ module <MODULENAME>(clk, reset, input_valid, input_ready, input_data, output_val
     parameter M = <M>;
     parameter N = <N>;
     parameter T = <T>;
+    parameter P = <P>;
     parameter ReLU = <ReLU>;
     parameter signed max_value = <T>'sd<max_value>;
     parameter signed min_value = -<T>'sd<min_value>;
@@ -266,39 +310,45 @@ module <MODULENAME>(clk, reset, input_valid, input_ready, input_data, output_val
     localparam enable_acc_after_initial_delay = enable_pipeline_reg_after_initial_delay + 1;        //The delay after which the accumulator must be enabled in order to not propage 'x'/junk values into it
 
     localparam ADDR_X_SIZE = $clog2(SIZE_X);
-    localparam ADDR_W_SIZE = $clog2(SIZE_W);
+    localparam ADDR_W_SIZE = $clog2(SIZE_W/P);
 
     parameter WIDTH_MEM_READ_X = ADDR_X_SIZE + 1;                             //Width of counter that writes to memory and reads from memory X (cntrMemX).
     parameter WIDTH_MEM_READ_W = ADDR_W_SIZE + 1;                             //Width of counter that writes to memory and reads from memory W (cntrMemW).
     parameter WIDTH_MAC = $clog2(N) + 1;                                      //Width of Mac counter that track columns executed in matrix (cntrMac).
     parameter WIDTH_EXEC = $clog2(M) + 1;                                     //Width of Execution counter that tracks the rows executed in matrix (cntrExec).
+    parameter WIDTH_MAC_SELECT = $clog2(P) + 1;
 
     input clk, reset, input_valid, output_ready;
     input signed [T - 1:0] input_data;
 
-    logic signed [T - 1:0] vectorMem_data_out, matrixMem_data_out;
+    logic signed [T - 1:0] vectorMem_data_out;
+    logic signed [T - 1:0]  <MATRIX_DATA_OUT_TEMPLATE>      //matrixMem_data_out0,  matrixMem_data_out1,  matrixMem_data_out2;
     logic [ADDR_X_SIZE-1:0] addr_x;
     logic [ADDR_W_SIZE-1:0] addr_w;
     logic wr_en_x;
     logic clear_acc, en_acc, en_pipeline_reg, enable_mult;
 
-    logic signed [T - 1:0] mac_output;
+    logic signed [T - 1:0] <MAC_OUTPUT_TEMPLATE>
+    // logic signed [T - 1:0] mac_output0;
+    // logic signed [T - 1:0] mac_output1;
+    // logic signed [T - 1:0] mac_output2;
     
     output logic signed [T - 1:0] output_data;
     output logic output_valid, input_ready;
 
-    generate
-        if(ReLU) begin
-            ReLU #(T) ReLU(mac_output, output_valid, output_data);
-        end
-    endgenerate
+    Controller #(M, N, T, P, ReLU, ADDR_X_SIZE, ADDR_W_SIZE, WIDTH_MEM_READ_X, WIDTH_MEM_READ_W, WIDTH_MAC, WIDTH_EXEC, WIDTH_MAC_SELECT, delay_pipeline_n, pipelineStages, enable_pipeline_reg_after_initial_delay, enable_acc_after_initial_delay) controller(clk, reset, input_valid, output_ready, addr_x, wr_en_x, addr_w, clear_acc, en_acc, en_pipeline_reg, enable_mult, input_ready, output_valid, <MAC_OUTPUT_PARAM_TEMPLATE>, output_data);
 
-    Controller #(M, N, T, ADDR_X_SIZE, ADDR_W_SIZE, WIDTH_MEM_READ_X, WIDTH_MEM_READ_W, WIDTH_MAC, WIDTH_EXEC, delay_pipeline_n, pipelineStages, enable_pipeline_reg_after_initial_delay, enable_acc_after_initial_delay) controller(clk, reset, input_valid, output_ready, addr_x, wr_en_x, addr_w, clear_acc, en_acc, en_pipeline_reg, enable_mult, input_ready, output_valid, output_data);
+    memory #(T, SIZE_X) vectorMem(clk, input_data, vectorMem_data_out, addr_x, wr_en_x);
 
-    memory #(T, SIZE_X) vectorMem(clk, input_data, vectorMem_data_out, addr_x, wr_en_x );
-    <MODULENAME>_W_rom rom(clk, addr_w, matrixMem_data_out);
+    <ROM_TEMPLATE>
+    // fc_6_4_14_1_3_W_rom0 rom0(clk, addr_w, matrixMem_data_out0);
+    // fc_6_4_14_1_3_W_rom1 rom1(clk, addr_w, matrixMem_data_out1);
+    // fc_6_4_14_1_3_W_rom2 rom2(clk, addr_w, matrixMem_data_out2);
 
-    mac_part1 #(pipelineStages, T, max_value, min_value) macUnit(clk, reset, en_acc, en_pipeline_reg, enable_mult, clear_acc, vectorMem_data_out, matrixMem_data_out, <ReLU_output>);   //<ReLU_output should be templated
+    <MAC_UNIT_TEMPLATE>
+    // mac_part1 #(pipelineStages, T, max_value, min_value) macUnit0(clk, reset, en_acc, en_pipeline_reg, enable_mult, clear_acc, vectorMem_data_out, matrixMem_data_out0, mac_output0);
+    // mac_part1 #(pipelineStages, T, max_value, min_value) macUnit1(clk, reset, en_acc, en_pipeline_reg, enable_mult, clear_acc, vectorMem_data_out, matrixMem_data_out1, mac_output1); 
+    // mac_part1 #(pipelineStages, T, max_value, min_value) macUnit2(clk, reset, en_acc, en_pipeline_reg, enable_mult, clear_acc, vectorMem_data_out, matrixMem_data_out2, mac_output2); 
 
     
 endmodule

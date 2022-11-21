@@ -2,13 +2,10 @@
 
 # ./testmode1 M N T R
 
-cd part1;
 rm -rf work;
 vlib work;
-cd ../;
 ./testgen 1 $1 $2 $3 $4 ;
 ./gen 1 $1 $2 $3 $4 const_$1_$2_$3_$4_1.txt;
-cd part1;
 vlog /home/home4/pmilder/ese507/synthesis/sim_ver/DW_mult_pipe.v;
 vlog /home/home4/pmilder/ese507/synthesis/sim_ver/DW02_mult.v;
 vlog fc_$1_$2_$3_$4_1.sv tb_fc_$1_$2_$3_$4_1.sv;

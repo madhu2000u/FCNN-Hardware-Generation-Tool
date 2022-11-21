@@ -81,7 +81,7 @@ int main(int argc, char* argv[]) {
 
       // Store the constants to file
       constFileName = "const_" + to_string(M) + "_" + to_string(N) + "_" + to_string(T) + "_" + to_string(R)  + "_" + to_string(P)+ ".txt";
-      os.open((mode == 1 ? "./part1/" : "./part2/") + constFileName);
+      os.open(constFileName);
       if (!os.is_open()) {
          cout << "ERROR opening " << constFileName << " for writing." << endl;
          return 1;
@@ -96,7 +96,7 @@ int main(int argc, char* argv[]) {
       genRandomVector(inputVals, numInputs, T/2);
 
       inFileName = "tb_fc_" + to_string(M) + "_" + to_string(N) + "_" + to_string(T) + "_" + to_string(R) + "_" + to_string(P) + ".in";
-      os.open((mode == 1 ? "./part1/" : "./part2/") + inFileName);
+      os.open(inFileName);
       if (!os.is_open()) {
          cout << "ERROR opening " << inFileName << " for writing." << endl;
          return 1;
@@ -112,7 +112,7 @@ int main(int argc, char* argv[]) {
       computeOutputs(wMatrix, inputVals, outputVals, M, N, T, R);
 
       outFileName = "tb_fc_" + to_string(M) + "_" + to_string(N) + "_" + to_string(T) + "_" + to_string(R) + "_" + to_string(P) + ".exp";
-      os.open((mode == 1 ? "./part1/" : "./part2/") + outFileName);
+      os.open(outFileName);
       if (!os.is_open()) {
          cout << "ERROR opening " << outFileName << " for writing." << endl;
          return 1;
@@ -125,7 +125,7 @@ int main(int argc, char* argv[]) {
 
       dut_name = "fc_" + to_string(M) + "_" + to_string(N) + "_" + to_string(T) + "_" + to_string(R) + "_" + to_string(P);
       tb_name = "tb_" + dut_name;
-      out_file = (mode == 1 ? "./part1/" : "./part2/") + tb_name + ".sv";
+      out_file = tb_name + ".sv";
 
    }
 
@@ -157,7 +157,7 @@ int main(int argc, char* argv[]) {
 
       constFileName = "const_" + to_string(N) + "_" + to_string(M1) + "_" + to_string(M2) + "_" + to_string(M3) + "_" + to_string(T) + "_" + to_string(R) + "_" + to_string(B) + ".txt";
 
-      os.open("./part3/" + constFileName);
+      os.open(constFileName);
       if (!os.is_open()) {
          cout << "ERROR opening " << constFileName << " for writing." << endl;
          return 1;
@@ -177,9 +177,9 @@ int main(int argc, char* argv[]) {
       dut_name = "net_" + to_string(N) + "_" + to_string(M1) + "_" + to_string(M2) + "_" + to_string(M3) + "_" + to_string(T) + "_" + to_string(R) + "_" + to_string(B);
       tb_name = "tb_" + dut_name;
       inFileName = tb_name + ".in";
-      out_file = "./part3/" + tb_name + ".sv";
+      out_file = tb_name + ".sv";
 
-      os.open("./part3/" + inFileName);
+      os.open(inFileName);
       if (!os.is_open()) {
          cout << "ERROR opening " << inFileName << " for writing." << endl;
          return 1;
@@ -198,7 +198,7 @@ int main(int argc, char* argv[]) {
 
 
       outFileName = tb_name + ".exp";
-      os.open("./part3/" + outFileName);
+      os.open(outFileName);
       if (!os.is_open()) {
          cout << "ERROR opening " << outFileName << " for writing." << endl;
          return 1;

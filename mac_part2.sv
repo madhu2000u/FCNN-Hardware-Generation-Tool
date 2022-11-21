@@ -39,7 +39,7 @@ module D_FF_28b(sum, f, clk, en_acc, clear_acc, reset);     //Accumulator
 endmodule
 
 
-module mac_part1(clk, reset, en_acc, en_pipeline_reg, enable_mult, clear_acc, a, b, f);
+module mac_part2(clk, reset, en_acc, en_pipeline_reg, enable_mult, clear_acc, a, b, f);
 
     //These parameters are passed from the main module fc_M_N_T_R_P.sv
     parameter multPipelinedStages = 2;
