@@ -188,18 +188,19 @@ void genROM(int M, int N, int P, vector<int>& constVector, int bits, string modN
             //int addr_scale = 0;
             int case_count = 0;           //case statment value for each rom module
             os << "module " << modName + to_string(p) << "(clk, addr, z);" << endl;
+            os << "   parameter T = 4;" << endl;
             os << "   input clk;" << endl;
-            os << "   input [" << addrBits-1 << ":0] addr;" << endl;
+            os << "   input [T - 1:0] addr;" << endl;
             os << "   output logic signed [" << bits-1 << ":0] z;" << endl;
             os << "   always_ff @(posedge clk) begin" << endl;
             os << "      case(addr)" << endl;
 
             for(int rom_sets = 0; rom_sets < M/P; rom_sets++){    //each rom module has N * (M/P) values
                init_addr = N * p;
-               offset_addr = (P * N * rom_sets);                  //calculate the offset addresses of the values from the constVector that must go into rom module p
+               offset_addr = (P * N * rom_sets);                  //calculate the offset addresses of the starting value from the constVector that must go into rom module p
                effective_addr = init_addr + offset_addr;
                vector<int>::iterator it = constVector.begin() + effective_addr;
-               for(int n = 0; n < N; n++){
+               for(int n = 0; n < N; n++){      //iterate N times from the effective address calculated and put them inside the rom module p
                   if (*it < 0)
                      os << "        " << case_count  << ": z <= -" << bits << "'d" << abs(*it) << ";" << endl;
                   else
@@ -290,7 +291,7 @@ void genFCLayer(int M, int N, int T, int R, int P, vector<int>& constVector, str
 
       x = "";
       for(int i = 0; i < P; i++){
-         x += romModName + to_string(i) + " rom" + to_string(i) + "(clk, addr_w, matrixMem_data_out" + to_string(i) + ");";
+         x += romModName + to_string(i) + "#(ADDR_W_SIZE) rom" + to_string(i) + "(clk, addr_w, matrixMem_data_out" + to_string(i) + ");";
       }
       myCmd += " s/<ROM_TEMPLATE>/" + x + "/g;";
 

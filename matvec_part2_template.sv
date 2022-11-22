@@ -60,7 +60,7 @@ module Controller(clk, reset, input_valid, output_ready, addr_x, wr_en_x, addr_w
 
     parameter delay_pipeline_n = 4;
     parameter pipelineStages = 0;
-    parameter enable_pipeline_reg_after_initial_delay = pipelineStages + 1;             
+    parameter enable_pipeline_reg_after_initial_delay = pipelineStages - 1;             
     parameter enable_acc_after_initial_delay = enable_pipeline_reg_after_initial_delay + 1;  
 
     input clk, reset, input_valid, output_ready;
@@ -152,11 +152,11 @@ module Controller(clk, reset, input_valid, output_ready, addr_x, wr_en_x, addr_w
                 en_pipeline_reg <= 0;
             end
         
-            if(countMem_W_Out == enable_pipeline_reg_after_initial_delay && initialExecState) begin        //enable the pipeline register after this delay to pass through a valid value
+            if(countMem_W_Out == enable_pipeline_reg_after_initial_delay && initialExecState) begin        //(reference #2) enable the pipeline register after this delay to pass through a valid value
                 en_pipeline_reg <= 1;
             end
 
-            if(countMem_W_Out == enable_acc_after_initial_delay && initialExecState) begin                 //enable the accumulator after this delay to pass through a valid value
+            if(countMem_W_Out == enable_acc_after_initial_delay && initialExecState) begin                 //(reference #2) enable the accumulator after this delay to pass through a valid value
                 en_acc <= 1;
                 initialExecState <= 0;
             end       
@@ -212,7 +212,7 @@ module Controller(clk, reset, input_valid, output_ready, addr_x, wr_en_x, addr_w
         clear_cntrMacSelect = (countMacSelect == P) ? 1 : 0;
         if(output_valid && output_ready) begin
             enable_cntrMacSelect = 1;
-            if(countMacOut == P-1) begin
+            if(countMacSelect == P) begin
                 enable_cntrMacSelect = 0;
             end
         end
@@ -224,22 +224,12 @@ module Controller(clk, reset, input_valid, output_ready, addr_x, wr_en_x, addr_w
         endcase
 
 
-        // case (countMacSelect)
-        //     0:muxOutput = mac_output0;
-        //     1:muxOutput = mac_output1;
-        //     2:muxOutput = mac_output2; 
-        //     default: muxOutput = 0;
-        // endcase
 
         if(operationState && ~clearState) begin    //read mode
             wr_en_x = input_ready;
             enable_cntrReadMem_X = countExecOut < M ? ~output_valid : 0;
             enable_cntrReadMem_W = ~output_valid;
             enable_cntrMac = en_acc ? 1 : 0;
-            
-
-            
-
 
             if((countMacOut == (delay_pipeline_n)) && ~clear_acc) begin     //Stall address and delay counters when output_valid = 1 and accumulator is not yet cleared (since value is not sampled yet)
                 enable_cntrReadMem_X = 0;
@@ -310,10 +300,10 @@ module <MODULENAME>(clk, reset, input_valid, input_ready, input_data, output_val
     localparam enable_acc_after_initial_delay = enable_pipeline_reg_after_initial_delay + 1;        //The delay after which the accumulator must be enabled in order to not propage 'x'/junk values into it
 
     localparam ADDR_X_SIZE = $clog2(SIZE_X);
-    localparam ADDR_W_SIZE = $clog2(SIZE_W/P);
+    localparam ADDR_W_SIZE = SIZE_W/P > enable_pipeline_reg_after_initial_delay ? $clog2(SIZE_W/P) : $clog2(pipelineStages);      //We are re-purposing ROM address counter to keep track of when to enable the pipeline register and accumulator (check reference #2). so we want the ROM addres counter to always count to at least enable_pipeline_reg_after_initial_delay, or else these registers won't enable on time and no result will be propagated throught the MAC.
 
     parameter WIDTH_MEM_READ_X = ADDR_X_SIZE + 1;                             //Width of counter that writes to memory and reads from memory X (cntrMemX).
-    parameter WIDTH_MEM_READ_W = ADDR_W_SIZE + 1;                             //Width of counter that writes to memory and reads from memory W (cntrMemW).
+    parameter WIDTH_MEM_READ_W = ADDR_W_SIZE;                             //Width of counter that writes to memory and reads from memory W (cntrMemW).
     parameter WIDTH_MAC = $clog2(N) + 1;                                      //Width of Mac counter that track columns executed in matrix (cntrMac).
     parameter WIDTH_EXEC = $clog2(M) + 1;                                     //Width of Execution counter that tracks the rows executed in matrix (cntrExec).
     parameter WIDTH_MAC_SELECT = $clog2(P) + 1;
@@ -329,9 +319,6 @@ module <MODULENAME>(clk, reset, input_valid, input_ready, input_data, output_val
     logic clear_acc, en_acc, en_pipeline_reg, enable_mult;
 
     logic signed [T - 1:0] <MAC_OUTPUT_TEMPLATE>
-    // logic signed [T - 1:0] mac_output0;
-    // logic signed [T - 1:0] mac_output1;
-    // logic signed [T - 1:0] mac_output2;
     
     output logic signed [T - 1:0] output_data;
     output logic output_valid, input_ready;
@@ -341,14 +328,7 @@ module <MODULENAME>(clk, reset, input_valid, input_ready, input_data, output_val
     memory #(T, SIZE_X) vectorMem(clk, input_data, vectorMem_data_out, addr_x, wr_en_x);
 
     <ROM_TEMPLATE>
-    // fc_6_4_14_1_3_W_rom0 rom0(clk, addr_w, matrixMem_data_out0);
-    // fc_6_4_14_1_3_W_rom1 rom1(clk, addr_w, matrixMem_data_out1);
-    // fc_6_4_14_1_3_W_rom2 rom2(clk, addr_w, matrixMem_data_out2);
 
     <MAC_UNIT_TEMPLATE>
-    // mac_part1 #(pipelineStages, T, max_value, min_value) macUnit0(clk, reset, en_acc, en_pipeline_reg, enable_mult, clear_acc, vectorMem_data_out, matrixMem_data_out0, mac_output0);
-    // mac_part1 #(pipelineStages, T, max_value, min_value) macUnit1(clk, reset, en_acc, en_pipeline_reg, enable_mult, clear_acc, vectorMem_data_out, matrixMem_data_out1, mac_output1); 
-    // mac_part1 #(pipelineStages, T, max_value, min_value) macUnit2(clk, reset, en_acc, en_pipeline_reg, enable_mult, clear_acc, vectorMem_data_out, matrixMem_data_out2, mac_output2); 
-
     
 endmodule
