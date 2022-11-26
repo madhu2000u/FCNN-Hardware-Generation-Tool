@@ -18,4 +18,4 @@ clean:
 # use with caution: deletes all generated designs. If you have other files in
 # your directory that have names related to these, be very careful
 cleangencode:
-	rm -f const_* tb_* net_*.sv fc_*.sv
+	rm -f const_* tb_* net_*.sv fc_*.sv l1_*.sv l2_*.sv l3_*.sv

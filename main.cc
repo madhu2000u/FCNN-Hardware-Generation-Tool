@@ -22,12 +22,13 @@ using namespace std;
 
 // Function prototypes
 void printUsage();
-void genFCLayer(int M, int N, int T, int R, int P, vector<int>& constvector, string modName, string out_file, ofstream &os);
+void genFCLayer(int M, int N, int T, int R, int P, vector<int>& constvector, string modName, ofstream &os, bool include);
 void genNetwork(int N, int M1, int M2, int M3, int T, int R, int B, vector<int>& constVector, string modName, ofstream &os);
 void readConstants(ifstream &constStream, vector<int>& constvector);
 void genROM(int M, int N, int P, vector<int>& constVector, int bits, string modName, ofstream &os);
 
 int global_mode = 0;
+int controller_cnt = 0;
 
 int main(int argc, char* argv[]) {
 
@@ -80,21 +81,21 @@ int main(int argc, char* argv[]) {
       // Read the constants out of the provided file and place them in the constVector vector
       readConstants(const_file, constVector);
 
-      string rom_base_name = "fc_" + to_string(M) + "_" + to_string(N) + "_" + to_string(T) + "_" + to_string(R) + "_" + to_string(P);
-      string rom_file_name_extension = "_W_rom";
+      string mainModName = "fc_" + to_string(M) + "_" + to_string(N) + "_" + to_string(T) + "_" + to_string(R) + "_" + to_string(P);
+      // string rom_file_name_extension = "_W_rom";
       
-      string rom_out_file = rom_base_name + rom_file_name_extension + ".sv";
+      // string rom_out_file = rom_base_name + rom_file_name_extension + ".sv";
 
-      os.open(rom_out_file);
-      if (os.is_open() != true) {
-         cout << "ERROR opening " << rom_out_file << " for write." << endl;
-         return 1;
-      }
+      // os.open(rom_out_file);
+      // if (os.is_open() != true) {
+      //    cout << "ERROR opening " << rom_out_file << " for write." << endl;
+      //    return 1;
+      // }
       // -------------------------------------------------------------
 
       // call the genFCLayer function you will write to generate this layer
-      string romModName = rom_base_name + rom_file_name_extension;
-      genFCLayer(M, N, T, R, P, constVector, romModName, rom_out_file, os); 
+      //string romModName = rom_base_name + rom_file_name_extension;
+      genFCLayer(M, N, T, R, P, constVector, mainModName, os, true); 
 
    }
    //--------------------------------------------------------------------
@@ -124,11 +125,11 @@ int main(int argc, char* argv[]) {
       string out_file = "net_" + to_string(N) + "_" + to_string(M1) + "_" + to_string(M2) + "_" + to_string(M3) + "_" + to_string(T) + "_" + to_string(R) + "_" + to_string(B)+ ".sv";
 
 
-      os.open(out_file);
-      if (os.is_open() != true) {
-         cout << "ERROR opening " << out_file << " for write." << endl;
-         return 1;
-      }
+      // os.open(out_file);
+      // if (os.is_open() != true) {
+      //    cout << "ERROR opening " << out_file << " for write." << endl;
+      //    return 1;
+      // }
       // -------------------------------------------------------------
 
       string mod_name = "net_" + to_string(N) + "_" + to_string(M1) + "_" + to_string(M2) + "_" + to_string(M3) + "_" + to_string(T) + "_" + to_string(R) + "_" + to_string(B);
@@ -145,7 +146,7 @@ int main(int argc, char* argv[]) {
    }
 
    // close the output stream
-   os.close();
+   //os.close();
 
 }
 
@@ -165,7 +166,7 @@ void genROM(int M, int N, int P, vector<int>& constVector, int bits, string modN
       int numWords = constVector.size();
       int addrBits = ceil(log2(numWords));
 
-      if(global_mode == 1){
+      if(global_mode == 0){
          os << "module " << modName << "(clk, addr, z);" << endl;
          os << "   input clk;" << endl;
          os << "   input [" << addrBits-1 << ":0] addr;" << endl;
@@ -181,7 +182,7 @@ void genROM(int M, int N, int P, vector<int>& constVector, int bits, string modN
          }
          os << "      endcase" << endl << "   end" << endl << "endmodule" << endl << endl;
       }
-      else if(global_mode == 2){
+      else if(global_mode == 1 || global_mode == 2 || global_mode == 3){
          addrBits = ceil(log2(numWords/P));
          int init_addr, offset_addr, effective_addr = 0;
          for(int p = 0; p < P; p++){      //Loop for each rom module
@@ -219,26 +220,38 @@ void genROM(int M, int N, int P, vector<int>& constVector, int bits, string modN
 
 // Parts 1 and 2
 // Here is where you add your code to produce a neural network layer.
-void genFCLayer(int M, int N, int T, int R, int P, vector<int>& constVector, string romModName, string rom_out_file, ofstream &os) {
+void genFCLayer(int M, int N, int T, int R, int P, vector<int>& constVector, string modName, ofstream &os, bool include) {
 
    // os << "module " << modName << "();" << endl;
    // os << "   // your stuff here!" << endl;
    // os << "endmodule" << endl << endl;
+   //string modName = "fc_" + to_string(M) + "_" + to_string(N) + "_" + to_string(T) + "_" + to_string(R) + "_" + to_string(P);
+   string rom_file_name_extension = "_W_rom";
+   
+   string romModName = modName + rom_file_name_extension;
+   string rom_out_file = romModName + ".sv";
+   // ofstream romOs;
+   os.open(rom_out_file);
+   if (os.is_open() != true) {
+      cout << "ERROR opening " << rom_out_file << " for write." << endl;
+      //return 1;
+   }
+
+
    long maxVal = ((long)1<<(T-1))-1;
    long minVal = ((long)1<<(T-1));
-
-   string max_value = to_string(T) + "'sd" + to_string(maxVal);
-   string min_value = "-" + to_string(T) + "'sd" + to_string(minVal);
-
-   string mainModName = "fc_" + to_string(M) + "_" + to_string(N) + "_" + to_string(T) + "_" + to_string(R) + "_" + to_string(P);
-   string out_file = "fc_" + to_string(M) + "_" + to_string(N) + "_" + to_string(T) + "_" + to_string(R) + "_" + to_string(P) + ".sv";
+   
+   string out_file = modName + ".sv";
 
    string mac_output = "mac_output";
    string output_data = "output_data";
-   if(global_mode == 1){
+   string comment = "//";
+   string empty_string = "";
+   if(global_mode == 0){
       string myCmd = "cat matvec_part1_template.sv";
       myCmd += "| sed 's/<ROM.sv>/" + rom_out_file + "/g; ";
-      myCmd += " s/<MODULENAME>/" + mainModName  + "/g;";
+      //myCmd += " s/<BOOL>/" + include ? empty_string : comment + "/g;";
+      myCmd += " s/<BOOL>/" + modName  + "/g;";
       myCmd += " s/<M>/" + to_string(M)  + "/g;";
       myCmd += " s/<N>/" + to_string(N)  + "/g;";
       myCmd += " s/<T>/" + to_string(T)  + "/g;";
@@ -254,52 +267,55 @@ void genFCLayer(int M, int N, int T, int R, int P, vector<int>& constVector, str
       myCmd += "' > " + out_file;
       system(myCmd.c_str());
    }
-   else if(global_mode == 2){
-
-      
-
-      string myCmd = "cat matvec_part2_template.sv";
-      myCmd += "| sed 's/<ROM.sv>/" + rom_out_file + "/g; ";
-      myCmd += " s/<MODULENAME>/" + mainModName  + "/g;";
-      myCmd += " s/<M>/" + to_string(M)  + "/g;";
-      myCmd += " s/<N>/" + to_string(N)  + "/g;";
-      myCmd += " s/<T>/" + to_string(T)  + "/g;";
-      myCmd += " s/<P>/" + to_string(P)  + "/g;";
-      myCmd += " s/<ReLU>/" +  to_string(R) + "/g;";
-      myCmd += " s/<max_value>/" + to_string(maxVal) + "/g;";
-      myCmd += " s/<min_value>/" + to_string(minVal) + "/g;";
-      
+   else if(global_mode == 1 || global_mode == 2 || global_mode == 3){
+      string myCmd = "cat matvec_template.sv";
+      myCmd += "| sed 's|<ROM.sv>|" + rom_out_file + "|g; ";
+      myCmd += " s|<BOOL>|" + (include ? empty_string : comment) + "|g;";
+      myCmd += " s|<MODULENAME>|" + modName  + "|g;";
+      myCmd += " s|<M>|" + to_string(M)  + "|g;";
+      myCmd += " s|<N>|" + to_string(N)  + "|g;";
+      myCmd += " s|<T>|" + to_string(T)  + "|g;";
+      myCmd += " s|<P>|" + to_string(P)  + "|g;";
+      myCmd += " s|<ReLU>|" +  to_string(R) + "|g;";
+      myCmd += " s|<max_value>|" + to_string(maxVal) + "|g;";
+      myCmd += " s|<min_value>|" + to_string(minVal) + "|g;";      
 
       string x = "";
       for(int i = 0; i < P; i++){
          x += "mac_output" + to_string(i) + ((i != P-1) ? "," : "");
       }
-      myCmd += " s/<MAC_OUTPUT_TEMPLATE>/" + x + ";" + "/g;";
-      myCmd += " s/<MAC_OUTPUT_PARAM_TEMPLATE>/" + x + "/g;";
+      myCmd += " s|<MAC_OUTPUT_TEMPLATE>|" + x + ";" + "|g;";
+      myCmd += " s|<MAC_OUTPUT_PARAM_TEMPLATE>|" + x + "|g;";
+
+      x = "";
+      x +="Controller" + to_string(controller_cnt);
+      
+      myCmd += " s|<CONTROLLER_TEMPLATE>|" + x + "|g;";
+
 
       x = "";
       for(int i = 0; i < P; i++){
          x +="matrixMem_data_out" + to_string(i) + ((i != P-1) ? "," : ";");
       }
-      myCmd += " s/<MATRIX_DATA_OUT_TEMPLATE>/" + x + "/g;";
+      myCmd += " s|<MATRIX_DATA_OUT_TEMPLATE>|" + x + "|g;";
 
       x = "";
       for(int i = 0; i < P; i++){
          x += to_string(i) + " : muxOutput = mac_output" + to_string(i) + ";";
       }
-      myCmd += " s/<MUX_TEMPLATE>/" + x + "/g;";
+      myCmd += " s|<MUX_TEMPLATE>|" + x + "|g;";
 
       x = "";
       for(int i = 0; i < P; i++){
          x += romModName + to_string(i) + "#(ADDR_W_SIZE) rom" + to_string(i) + "(clk, addr_w, matrixMem_data_out" + to_string(i) + ");";
       }
-      myCmd += " s/<ROM_TEMPLATE>/" + x + "/g;";
+      myCmd += " s|<ROM_TEMPLATE>|" + x + "|g;";
 
       x = "";
       for(int i = 0; i < P; i++){
-         x += "mac_part2 #(pipelineStages, T, max_value, min_value) macUnit" + to_string(i) + "(clk, reset, en_acc, en_pipeline_reg, enable_mult, clear_acc, vectorMem_data_out, matrixMem_data_out" + to_string(i) + ", mac_output" + to_string(i) + ");";
+         x += "mac #(pipelineStages, T, max_value, min_value) macUnit" + to_string(i) + "(clk, reset, en_acc, en_pipeline_reg, enable_mult, clear_acc, vectorMem_data_out, matrixMem_data_out" + to_string(i) + ", mac_output" + to_string(i) + ");";
       }
-      myCmd += " s/<MAC_UNIT_TEMPLATE>/" + x + "/g;";
+      myCmd += " s|<MAC_UNIT_TEMPLATE>|" + x + "|g;";
       myCmd += "' > " + out_file;
       system(myCmd.c_str());
    }
@@ -321,6 +337,7 @@ void genFCLayer(int M, int N, int T, int R, int P, vector<int>& constVector, str
    // Generate a ROM (for W) with constants 0 through M*N-1, with T bits
    //string romModName = modName + "_W_rom";
    genROM(M, N, P, constVector, T, romModName, os);
+   os.close();
 
 }
 
@@ -335,14 +352,10 @@ void genNetwork(int N, int M1, int M2, int M3, int T, int R, int B, vector<int>&
 
    // Here you will write code to figure out the best values to use for P1, P2, and P3, given
    // B. 
-   int P1 = 1; // replace this with your optimized value
-   int P2 = 1; // replace this with your optimized value
+   int P1 = 4; // replace this with your optimized value
+   int P2 = 2; // replace this with your optimized value
    int P3 = 1; // replace this with your optimized value
 
-   // output top-level module
-   os << "module " << modName << "();" << endl;
-   os << "   // this module should instantiate three layers and wire them together" << endl;
-   os << "endmodule" << endl;
    
    // -------------------------------------------------------------------------
    // Split up constVector for the three layers
@@ -362,23 +375,37 @@ void genNetwork(int N, int M1, int M2, int M3, int T, int R, int B, vector<int>&
    vector<int> constVector3(&constVector[start], &constVector[stop]);
 
    if (stop > constVector.size()) {
-      os << "ERROR: constVector does not contain enough data for the requested design" << endl;
-      os << "The design parameters requested require " << stop << " numbers, but the provided data only have " << constVector.size() << " constants" << endl;
+      cout << "ERROR: constVector does not contain enough data for the requested design" << endl;
+      cout << "The design parameters requested require " << stop << " numbers, but the provided data only have " << constVector.size() << " constants" << endl;
       assert(false);
    }
    // --------------------------------------------------------------------------
 
-
+   string out_file = modName + ".sv";
    // generate the three layer modules
-   string subModName1 = "l1_fc_" + to_string(M1) + "_" + to_string(N) + "_" + to_string(T) + "_" + to_string(R) + "_" + to_string(P1);
    
-   //genFCLayer(M1, N, T, R, P1, constVector1, subModName1, os);
+   string subModName1 = "l1_fc_" + to_string(M1) + "_" + to_string(N) + "_" + to_string(T) + "_" + to_string(R) + "_" + to_string(P1);
+   genFCLayer(M1, N, T, R, P1, constVector1, subModName1, os, true);
 
+   controller_cnt++;
    string subModName2 = "l2_fc_" + to_string(M2) + "_" + to_string(M1) + "_" + to_string(T) + "_" + to_string(R) + "_" + to_string(P2);
-   //genFCLayer(M2, M1, T, R, P2, constVector2, subModName2, os);
+   genFCLayer(M2, M1, T, R, P2, constVector2, subModName2, os, false);
 
-   string subModName3 = "l3_fc3_" + to_string(M3) + "_" + to_string(M2) + "_" + to_string(T) + "_" + to_string(R) + "_" + to_string(P3);
-   //genFCLayer(M3, M2, T, R, P3, constVector3, subModName3, os);
+   controller_cnt++;
+   string subModName3 = "l3_fc_" + to_string(M3) + "_" + to_string(M2) + "_" + to_string(T) + "_" + to_string(R) + "_" + to_string(P3);
+   genFCLayer(M3, M2, T, R, P3, constVector3, subModName3, os, false);
+
+   string myCmd = "cat Net_template.sv";
+   myCmd += "| sed 's/<l1>/" + subModName1 + ".sv" + "/g; ";
+   myCmd += " s/<l2>/" + subModName2 + ".sv"  + "/g;";
+   myCmd += " s/<l3>/" + subModName3 + ".sv"  + "/g;";
+   myCmd += " s/<NETMODULE>/" + modName  + "/g;";
+   myCmd += " s/<l1_MODULENAME>/" + subModName1  + "/g;";
+   myCmd += " s/<l2_MODULENAME>/" + subModName2  + "/g;";
+   myCmd += " s/<l3_MODULENAME>/" + subModName3  + "/g;";
+   myCmd += " s/<T>/" + to_string(T)  + "/g;";
+   myCmd += "' > " + out_file;
+   system(myCmd.c_str());
 
 }
 
