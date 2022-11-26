@@ -1,0 +1,12 @@
+#!/usr/bin/bash
+
+# ./testmode3 N M1 M2 M3 T R B
+
+rm -rf work
+vlib work
+./testgen 3 $1 $2 $3 $4 $5 $6 $7
+./gen 3 $1 $2 $3 $4 $5 $6 $7 const_$1_$2_$3_$4_$5_$6_$7.txt
+vlog /home/home4/pmilder/ese507/synthesis/sim_ver/DW_mult_pipe.v
+vlog /home/home4/pmilder/ese507/synthesis/sim_ver/DW02_mult.v
+vlog net_$1_$2_$3_$4_$5_$6_$7.sv tb_net_$1_$2_$3_$4_$5_$6_$7.sv 
+vsim -c tb_net_$1_$2_$3_$4_$5_$6_$7 -do "run -all; quit"

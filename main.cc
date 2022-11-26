@@ -28,7 +28,7 @@ void readConstants(ifstream &constStream, vector<int>& constvector);
 void genROM(int M, int N, int P, vector<int>& constVector, int bits, string modName, ofstream &os);
 
 int global_mode = 0;
-int controller_cnt = 0;
+int controller_cnt = 0;    //since our controller module is inside main template file (matvec_template), we need different controller module for each layer, other wise vlog will attempt to override if all have the same name;
 
 int main(int argc, char* argv[]) {
 
@@ -166,56 +166,37 @@ void genROM(int M, int N, int P, vector<int>& constVector, int bits, string modN
       int numWords = constVector.size();
       int addrBits = ceil(log2(numWords));
 
-      if(global_mode == 0){
-         os << "module " << modName << "(clk, addr, z);" << endl;
+      addrBits = ceil(log2(numWords/P));
+      int init_addr, offset_addr, effective_addr = 0;
+      for(int rom_count = 0; rom_count < P; rom_count++){      //Loop for each rom module
+         int case_count = 0;           //case statment value for each rom module
+         os << "module " << modName + to_string(rom_count) << "(clk, addr, z);" << endl;
+         os << "   parameter T = 4;" << endl;
          os << "   input clk;" << endl;
-         os << "   input [" << addrBits-1 << ":0] addr;" << endl;
+         os << "   input [T - 1:0] addr;" << endl;
          os << "   output logic signed [" << bits-1 << ":0] z;" << endl;
          os << "   always_ff @(posedge clk) begin" << endl;
          os << "      case(addr)" << endl;
-         int i=0;
-         for (vector<int>::iterator it = constVector.begin(); it < constVector.end(); it++, i++) {
-            if (*it < 0)
-               os << "        " << i << ": z <= -" << bits << "'d" << abs(*it) << ";" << endl;
-            else
-               os << "        " << i << ": z <= "  << bits << "'d" << *it      << ";" << endl;
+
+         for(int rom_sets = 0; rom_sets < M/P; rom_sets++){    //each rom module has N * (M/P) values
+            init_addr = N * rom_count;
+            offset_addr = (P * N * rom_sets);                  //calculate the offset addresses of the starting value from the constVector that must go into rom module "rom_count"
+            effective_addr = init_addr + offset_addr;
+            vector<int>::iterator it = constVector.begin() + effective_addr;
+            for(int n = 0; n < N; n++){      //iterate N times from the effective address calculated and put them inside the rom module "rom_count"
+               if (*it < 0)
+                  os << "        " << case_count  << ": z <= -" << bits << "'d" << abs(*it) << ";" << endl;
+               else
+                  os << "        " << case_count << ": z <= "  << bits << "'d" << *it      << ";" << endl;
+               
+               it++;
+               case_count++;
+            }
          }
          os << "      endcase" << endl << "   end" << endl << "endmodule" << endl << endl;
+         
       }
-      else if(global_mode == 1 || global_mode == 2 || global_mode == 3){
-         addrBits = ceil(log2(numWords/P));
-         int init_addr, offset_addr, effective_addr = 0;
-         for(int p = 0; p < P; p++){      //Loop for each rom module
-            //int addr_scale = 0;
-            int case_count = 0;           //case statment value for each rom module
-            os << "module " << modName + to_string(p) << "(clk, addr, z);" << endl;
-            os << "   parameter T = 4;" << endl;
-            os << "   input clk;" << endl;
-            os << "   input [T - 1:0] addr;" << endl;
-            os << "   output logic signed [" << bits-1 << ":0] z;" << endl;
-            os << "   always_ff @(posedge clk) begin" << endl;
-            os << "      case(addr)" << endl;
-
-            for(int rom_sets = 0; rom_sets < M/P; rom_sets++){    //each rom module has N * (M/P) values
-               init_addr = N * p;
-               offset_addr = (P * N * rom_sets);                  //calculate the offset addresses of the starting value from the constVector that must go into rom module p
-               effective_addr = init_addr + offset_addr;
-               vector<int>::iterator it = constVector.begin() + effective_addr;
-               for(int n = 0; n < N; n++){      //iterate N times from the effective address calculated and put them inside the rom module p
-                  if (*it < 0)
-                     os << "        " << case_count  << ": z <= -" << bits << "'d" << abs(*it) << ";" << endl;
-                  else
-                     os << "        " << case_count << ": z <= "  << bits << "'d" << *it      << ";" << endl;
-                  
-                  it++;
-                  case_count++;
-               }
-               //addr_scale++;
-            }
-            os << "      endcase" << endl << "   end" << endl << "endmodule" << endl << endl;
-            
-         }
-      }
+      // }
 }
 
 // Parts 1 and 2
@@ -234,7 +215,6 @@ void genFCLayer(int M, int N, int T, int R, int P, vector<int>& constVector, str
    os.open(rom_out_file);
    if (os.is_open() != true) {
       cout << "ERROR opening " << rom_out_file << " for write." << endl;
-      //return 1;
    }
 
 
@@ -247,78 +227,56 @@ void genFCLayer(int M, int N, int T, int R, int P, vector<int>& constVector, str
    string output_data = "output_data";
    string comment = "//";
    string empty_string = "";
-   if(global_mode == 0){
-      string myCmd = "cat matvec_part1_template.sv";
-      myCmd += "| sed 's/<ROM.sv>/" + rom_out_file + "/g; ";
-      //myCmd += " s/<BOOL>/" + include ? empty_string : comment + "/g;";
-      myCmd += " s/<BOOL>/" + modName  + "/g;";
-      myCmd += " s/<M>/" + to_string(M)  + "/g;";
-      myCmd += " s/<N>/" + to_string(N)  + "/g;";
-      myCmd += " s/<T>/" + to_string(T)  + "/g;";
-      myCmd += " s/<ReLU>/" +  to_string(R) + "/g;";
-      myCmd += " s/<max_value>/" + to_string(maxVal) + "/g;";
-      myCmd += " s/<min_value>/" + to_string(minVal) + "/g;";
-      if(R){
-         myCmd += " s/<ReLU_output>/" + mac_output  + "/g;";
-      }
-      else{
-         myCmd += " s/<ReLU_output>/" +  output_data + "/g;";
-      }
-      myCmd += "' > " + out_file;
-      system(myCmd.c_str());
+   string myCmd = "cat matvec_template.sv";
+   myCmd += "| sed 's|<ROM.sv>|" + rom_out_file + "|g; ";
+   myCmd += " s|<BOOL>|" + (include ? empty_string : comment) + "|g;";
+   myCmd += " s|<MODULENAME>|" + modName  + "|g;";
+   myCmd += " s|<M>|" + to_string(M)  + "|g;";
+   myCmd += " s|<N>|" + to_string(N)  + "|g;";
+   myCmd += " s|<T>|" + to_string(T)  + "|g;";
+   myCmd += " s|<P>|" + to_string(P)  + "|g;";
+   myCmd += " s|<ReLU>|" +  to_string(R) + "|g;";
+   myCmd += " s|<max_value>|" + to_string(maxVal) + "|g;";
+   myCmd += " s|<min_value>|" + to_string(minVal) + "|g;";      
+
+   string x = "";
+   for(int i = 0; i < P; i++){
+      x += "mac_output" + to_string(i) + ((i != P-1) ? "," : "");
    }
-   else if(global_mode == 1 || global_mode == 2 || global_mode == 3){
-      string myCmd = "cat matvec_template.sv";
-      myCmd += "| sed 's|<ROM.sv>|" + rom_out_file + "|g; ";
-      myCmd += " s|<BOOL>|" + (include ? empty_string : comment) + "|g;";
-      myCmd += " s|<MODULENAME>|" + modName  + "|g;";
-      myCmd += " s|<M>|" + to_string(M)  + "|g;";
-      myCmd += " s|<N>|" + to_string(N)  + "|g;";
-      myCmd += " s|<T>|" + to_string(T)  + "|g;";
-      myCmd += " s|<P>|" + to_string(P)  + "|g;";
-      myCmd += " s|<ReLU>|" +  to_string(R) + "|g;";
-      myCmd += " s|<max_value>|" + to_string(maxVal) + "|g;";
-      myCmd += " s|<min_value>|" + to_string(minVal) + "|g;";      
+   myCmd += " s|<MAC_OUTPUT_TEMPLATE>|" + x + ";" + "|g;";
+   myCmd += " s|<MAC_OUTPUT_PARAM_TEMPLATE>|" + x + "|g;";
 
-      string x = "";
-      for(int i = 0; i < P; i++){
-         x += "mac_output" + to_string(i) + ((i != P-1) ? "," : "");
-      }
-      myCmd += " s|<MAC_OUTPUT_TEMPLATE>|" + x + ";" + "|g;";
-      myCmd += " s|<MAC_OUTPUT_PARAM_TEMPLATE>|" + x + "|g;";
-
-      x = "";
-      x +="Controller" + to_string(controller_cnt);
-      
-      myCmd += " s|<CONTROLLER_TEMPLATE>|" + x + "|g;";
+   x = "";
+   x +="Controller" + to_string(controller_cnt);
+   
+   myCmd += " s|<CONTROLLER_TEMPLATE>|" + x + "|g;";
 
 
-      x = "";
-      for(int i = 0; i < P; i++){
-         x +="matrixMem_data_out" + to_string(i) + ((i != P-1) ? "," : ";");
-      }
-      myCmd += " s|<MATRIX_DATA_OUT_TEMPLATE>|" + x + "|g;";
-
-      x = "";
-      for(int i = 0; i < P; i++){
-         x += to_string(i) + " : muxOutput = mac_output" + to_string(i) + ";";
-      }
-      myCmd += " s|<MUX_TEMPLATE>|" + x + "|g;";
-
-      x = "";
-      for(int i = 0; i < P; i++){
-         x += romModName + to_string(i) + "#(ADDR_W_SIZE) rom" + to_string(i) + "(clk, addr_w, matrixMem_data_out" + to_string(i) + ");";
-      }
-      myCmd += " s|<ROM_TEMPLATE>|" + x + "|g;";
-
-      x = "";
-      for(int i = 0; i < P; i++){
-         x += "mac #(pipelineStages, T, max_value, min_value) macUnit" + to_string(i) + "(clk, reset, en_acc, en_pipeline_reg, enable_mult, clear_acc, vectorMem_data_out, matrixMem_data_out" + to_string(i) + ", mac_output" + to_string(i) + ");";
-      }
-      myCmd += " s|<MAC_UNIT_TEMPLATE>|" + x + "|g;";
-      myCmd += "' > " + out_file;
-      system(myCmd.c_str());
+   x = "";
+   for(int i = 0; i < P; i++){
+      x +="matrixMem_data_out" + to_string(i) + ((i != P-1) ? "," : ";");
    }
+   myCmd += " s|<MATRIX_DATA_OUT_TEMPLATE>|" + x + "|g;";
+
+   x = "";
+   for(int i = 0; i < P; i++){
+      x += to_string(i) + " : muxOutput = mac_output" + to_string(i) + ";";
+   }
+   myCmd += " s|<MUX_TEMPLATE>|" + x + "|g;";
+
+   x = "";
+   for(int i = 0; i < P; i++){
+      x += romModName + to_string(i) + "#(ADDR_W_SIZE) rom" + to_string(i) + "(clk, addr_w, matrixMem_data_out" + to_string(i) + ");";
+   }
+   myCmd += " s|<ROM_TEMPLATE>|" + x + "|g;";
+
+   x = "";
+   for(int i = 0; i < P; i++){
+      x += "mac #(pipelineStages, T, max_value, min_value) macUnit" + to_string(i) + "(clk, reset, en_acc, en_pipeline_reg, enable_mult, clear_acc, vectorMem_data_out, matrixMem_data_out" + to_string(i) + ", mac_output" + to_string(i) + ");";
+   }
+   myCmd += " s|<MAC_UNIT_TEMPLATE>|" + x + "|g;";
+   myCmd += "' > " + out_file;
+   system(myCmd.c_str());
 
    // You will need to generate ROM(s) with values from the pre-stored constant values.
    // Here is code that demonstrates how to do this for the simple case where you want to put all of
@@ -352,9 +310,9 @@ void genNetwork(int N, int M1, int M2, int M3, int T, int R, int B, vector<int>&
 
    // Here you will write code to figure out the best values to use for P1, P2, and P3, given
    // B. 
-   int P1 = 4; // replace this with your optimized value
-   int P2 = 2; // replace this with your optimized value
-   int P3 = 1; // replace this with your optimized value
+   int P1 = 14; // replace this with your optimized value
+   int P2 = 23; // replace this with your optimized value
+   int P3 = 65; // replace this with your optimized value
 
    
    // -------------------------------------------------------------------------
