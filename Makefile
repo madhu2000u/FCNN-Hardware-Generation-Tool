@@ -5,12 +5,16 @@ TBEXEC = testgen
 FLAGS = -std=c++11 -O3
 
 all: generator tester
+throughput: throughput_tester generator
 
 generator:
 	g++ $(SRCCPP) -o $(EXECNAME) $(FLAGS)
 
 tester:
 	g++ $(TBSRC) -o $(TBEXEC) $(FLAGS)
+ 
+throughput_tester:
+	g++ testgen_throughput.cc -o throughput_testgen $(FLAGS)
 
 clean:
 	rm -f $(EXECNAME) $(TBEXEC)

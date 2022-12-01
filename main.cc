@@ -299,6 +299,10 @@ void genFCLayer(int M, int N, int T, int R, int P, vector<int>& constVector, str
 
 }
 
+void optimizer(int M1, int M2, int M3, int N, int B){
+   
+}
+
 // Part 3: Generate a hardware system with three layers interconnected.
 // Layer 1: Input length: N, output length: M1
 // Layer 2: Input length: M1, output length: M2
@@ -310,9 +314,9 @@ void genNetwork(int N, int M1, int M2, int M3, int T, int R, int B, vector<int>&
 
    // Here you will write code to figure out the best values to use for P1, P2, and P3, given
    // B. 
-   int P1 = 14; // replace this with your optimized value
-   int P2 = 23; // replace this with your optimized value
-   int P3 = 65; // replace this with your optimized value
+   int P1 = 8; // replace this with your optimized value
+   int P2 = 2; // replace this with your optimized value
+   int P3 = 10; // replace this with your optimized value
 
    
    // -------------------------------------------------------------------------

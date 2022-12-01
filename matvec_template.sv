@@ -12,38 +12,6 @@ Date: November 16, 2022
 <BOOL>`include "mac.sv"
 <BOOL>`include "memory.sv"
 
-// module Counter(clk, reset, clear, enable, countOut);
-//     parameter WIDTH = 4;
-//     input clk, reset, clear, enable;
-//     logic [WIDTH-1:0] countIn;
-//     output logic [WIDTH-1:0]countOut;
-
-
-//     always_ff @( posedge clk ) begin
-//         if(reset || clear)
-//             countOut <= 0;
-//         else if(enable) begin
-//             countOut <= countOut + 1;
-//         end        
-//     end
-    
-    
-// endmodule
-
-// module ReLU (ReLU_input, output_data);
-//     parameter T = 14;
-
-//     input logic [T - 1:0] ReLU_input;
-//     output logic [T - 1:0] output_data;
-
-//     always_comb begin
-//         if(ReLU_input[T - 1])
-//             output_data = 0;
-//         else if(~ReLU_input[T - 1])
-//             output_data = ReLU_input;   
-//     end
-    
-// endmodule
 
 module <CONTROLLER_TEMPLATE>(clk, reset, input_valid, output_ready, addr_x, wr_en_x, addr_w, clear_acc, en_acc, en_pipeline_reg, enable_mult, input_ready, output_valid, <MAC_OUTPUT_PARAM_TEMPLATE>, output_data);
     
