@@ -18,6 +18,7 @@
 #include <cstring>
 #include <assert.h>
 #include <math.h>
+#include <algorithm>
 using namespace std;
 
 // Function prototypes
@@ -29,6 +30,16 @@ void genROM(int M, int N, int P, vector<int>& constVector, int bits, string modN
 
 int global_mode = 0;
 int controller_cnt = 0;    //since our controller module is inside main template file (matvec_template), we need different controller module for each layer, other wise vlog will attempt to override if all have the same name;
+
+struct layer
+{
+   int layer_number;
+   int tot_computations;
+   int P;
+   int priority;     //1-> high, 2-> medium, 3-> low
+   vector<int> P_list;
+};
+
 
 int main(int argc, char* argv[]) {
 
@@ -299,8 +310,67 @@ void genFCLayer(int M, int N, int T, int R, int P, vector<int>& constVector, str
 
 }
 
-void optimizer(int M1, int M2, int M3, int N, int B){
-   
+bool compareByComputations(const layer &a, const layer& b){
+   return a.tot_computations >= b.tot_computations;
+}
+
+bool compareByLayerNumber(const layer &a, const layer& b){
+   return a.layer_number < b.layer_number;
+}
+
+
+vector<layer> optimizer(int M1, int M2, int M3, int N, int B){
+   layer l1, l2, l3;
+   l1.layer_number = 1;
+   l2.layer_number = 2;
+   l3.layer_number = 3;
+
+   l1.tot_computations = M1 * N;
+   l2.tot_computations = M2 * M1;
+   l3.tot_computations = M3 * M2;
+
+  
+   vector<layer> layers;
+   layers.push_back(l1);
+   layers.push_back(l2);
+   layers.push_back(l3);
+
+   for(int i = 1; i <= 3; i++){
+      int M = (i == 1) ? M1 : (i == 2 ? M2 : M3);
+      for(int p = 1; p <= M; p++){
+         if(M % p == 0){
+            layers[i - 1].P_list.push_back(p);
+         }
+      }
+   }  
+
+   sort(layers.begin(), layers.end(), compareByComputations);
+
+   for(int i = 0; i < 3; i++){
+      cout<<layers[i].layer_number<<" "<<layers[i].P<<" "<<layers[i].priority<<" "<<layers[i].tot_computations<<endl;
+   }
+
+   for(int i = 1; i <= 3; i++){
+      int atmost_P = B - (3 - i);
+      int P = 0;
+      for(int j = layers[i - 1].P_list.size() - 1; j >= 0; j--){
+         if(layers[i - 1].P_list[j] <= atmost_P){
+            layers[i - 1].P = layers[i - 1].P_list[j];
+            B = B - layers[i - 1].P_list[j];
+            break;
+         }
+
+      }
+
+   }
+
+   for(int i = 0; i < 3; i++){
+      cout<<layers[i].layer_number<<" "<<layers[i].P<<" "<<layers[i].priority<<" "<<layers[i].tot_computations<<endl;
+   }
+
+   return layers;
+
+
 }
 
 // Part 3: Generate a hardware system with three layers interconnected.
@@ -314,9 +384,14 @@ void genNetwork(int N, int M1, int M2, int M3, int T, int R, int B, vector<int>&
 
    // Here you will write code to figure out the best values to use for P1, P2, and P3, given
    // B. 
-   int P1 = 8; // replace this with your optimized value
-   int P2 = 2; // replace this with your optimized value
-   int P3 = 10; // replace this with your optimized value
+
+   vector<layer> layers = optimizer(M1, M2, M3, N, B);
+   sort(layers.begin(), layers.end(), compareByLayerNumber);
+   int P1 = layers[0].P; // replace this with your optimized value
+   int P2 = layers[1].P; // replace this with your optimized value
+   int P3 = layers[2].P; // replace this with your optimized value
+
+   cout<<P1<<" "<<P2<<" "<<P3<<endl;
 
    
    // -------------------------------------------------------------------------
