@@ -6,7 +6,7 @@ rm -rf work;
 vlib work;
 ./testgen 1 $1 $2 $3 $4 ;
 ./gen 1 $1 $2 $3 $4 const_$1_$2_$3_$4_1.txt;
-vlog /home/home4/pmilder/ese507/synthesis/sim_ver/DW_mult_pipe.v;
-vlog /home/home4/pmilder/ese507/synthesis/sim_ver/DW02_mult.v;
-vlog fc_$1_$2_$3_$4_1.sv tb_fc_$1_$2_$3_$4_1.sv;
+#vlog /home/home4/pmilder/ese507/synthesis/sim_ver/DW_mult_pipe.v;
+#vlog /home/home4/pmilder/ese507/synthesis/sim_ver/DW02_mult.v;
+vlog fc_$1_$2_$3_$4_1.sv tb_fc_$1_$2_$3_$4_1.sv DW_mult_pipe.v;
 vsim -c tb_fc_$1_$2_$3_$4_1 -do "run -all; quit"
